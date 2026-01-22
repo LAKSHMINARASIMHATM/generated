@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Bill, PriceComparison } from '../types.tsx';
 import { ShoppingBag, ArrowLeft, Zap, CheckCircle2, FileText } from 'lucide-react';
 import DigitalBillRenderer from '../components/DigitalBillRenderer.tsx';
+import { api } from '../api';
 
 interface AnalysisResultsProps {
   bills: Bill[];
@@ -53,20 +54,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({ bills }) => {
         setPricesError(null);
 
         console.log(`🔍 Fetching prices for bill ID: ${bill.id}`);
-        const response = await fetch(`/api/v1/analysis/prices/${bill.id}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('smartspend_token')}`
-          }
-        });
-
-        console.log(`📡 Response status: ${response.status}`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ API Error: ${response.status} - ${errorText}`);
-          throw new Error(`Failed to fetch prices: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await api.analysis.getPrices(bill.id);
         console.log('✅ Received price data:', data);
         setRealTimePrices(data.prices);
       } catch (error) {
@@ -215,9 +203,44 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({ bills }) => {
                 📊 Estimated Prices
               </div>
             ) : (
-              <div className="px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200 uppercase tracking-widest">
-                ✅ Real-time Prices
-              </div>
+              <>
+                {/* Show source breakdown */}
+                {(() => {
+                  let apiCount = 0;
+                  let scrapedCount = 0;
+                  let estimatedCount = 0;
+
+                  comparisons.forEach(comp => {
+                    comp.platforms.forEach(p => {
+                      if (p.confidence !== undefined) {
+                        if (p.confidence > 0.8) apiCount++;
+                        else if (p.confidence >= 0.3) scrapedCount++;
+                        else estimatedCount++;
+                      }
+                    });
+                  });
+
+                  return (
+                    <>
+                      {apiCount > 0 && (
+                        <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200 uppercase tracking-widest">
+                          🌧️ {apiCount} API
+                        </div>
+                      )}
+                      {scrapedCount > 0 && (
+                        <div className="px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200 uppercase tracking-widest">
+                          🕷️ {scrapedCount} Scraped
+                        </div>
+                      )}
+                      {estimatedCount > 0 && (
+                        <div className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200 uppercase tracking-widest">
+                          📊 {estimatedCount} Est.
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
             )}
             <div className="px-4 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-full border border-primary/20 uppercase tracking-widest">
               Best Deals Found
@@ -234,9 +257,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({ bills }) => {
         )}
 
         {!pricesError && !pricesLoading && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-start gap-3">
-            <div className="text-green-700 text-sm">
-              <span className="font-bold">✅ Success:</span> Showing real-time price comparisons. Click links to verify and purchase.
+          <div className="bg-gradient-to-r from-blue-50 via-green-50 to-amber-50 border border-stone-200 rounded-2xl p-4 flex items-start gap-3">
+            <div className="text-stone-700 text-sm">
+              <span className="font-bold">✅ Real Prices Loaded:</span> Showing live data from e-commerce platforms.
+              <span className="ml-1 text-xs">
+                🌧️ API = RainforestAPI • 🕷️ Scraped = Web scraping • 📊 Est. = Intelligent estimation
+              </span>
             </div>
           </div>
         )}
@@ -273,18 +299,57 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({ bills }) => {
                 </div>
               </div>
               <div className="bg-stone-50 px-6 py-3 flex gap-3 overflow-x-auto text-[10px] font-bold no-scrollbar">
-                {comp.platforms.map((p, i) => (
-                  <a
-                    key={i}
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full cursor-pointer hover:shadow-md transition-all ${p.name === comp.bestPlatform ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200' : 'bg-white text-stone-500 border border-stone-200 hover:border-stone-300'}`}
-                  >
-                    {p.name === comp.bestPlatform && <CheckCircle2 className="w-3 h-3" />}
-                    {p.name}: ₹{p.price.toFixed(2)}
-                  </a>
-                ))}
+                {comp.platforms.map((p, i) => {
+                  // Determine source badge based on confidence
+                  let sourceBadge = '';
+                  let badgeColor = '';
+                  if (p.confidence !== undefined) {
+                    if (p.confidence > 0.8) {
+                      sourceBadge = '🌧️ API';
+                      badgeColor = 'text-blue-600';
+                    } else if (p.confidence >= 0.3) {
+                      sourceBadge = '🕷️ Scraped';
+                      badgeColor = 'text-green-600';
+                    } else {
+                      sourceBadge = '📊 Est.';
+                      badgeColor = 'text-amber-600';
+                    }
+                  }
+
+                  return (
+                    <a
+                      key={i}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex-shrink-0 flex flex-col gap-0.5 px-3 py-1.5 rounded-lg cursor-pointer hover:shadow-md transition-all ${p.name === comp.bestPlatform ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200' : 'bg-white text-stone-500 border border-stone-200 hover:border-stone-300'}`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {p.name === comp.bestPlatform && <CheckCircle2 className="w-3 h-3" />}
+                        <span className="font-bold">{p.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-extrabold">₹{p.price.toFixed(2)}</span>
+                        {sourceBadge && (
+                          <span className={`text-[9px] ${badgeColor} opacity-75`}>
+                            {sourceBadge}
+                          </span>
+                        )}
+                      </div>
+                      {p.confidence !== undefined && (
+                        <div className="w-full bg-stone-200 rounded-full h-1 mt-0.5">
+                          <div
+                            className={`h-1 rounded-full transition-all ${p.confidence > 0.8 ? 'bg-blue-500' :
+                              p.confidence >= 0.3 ? 'bg-green-500' :
+                                'bg-amber-500'
+                              }`}
+                            style={{ width: `${p.confidence * 100}%` }}
+                          />
+                        </div>
+                      )}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           ))}

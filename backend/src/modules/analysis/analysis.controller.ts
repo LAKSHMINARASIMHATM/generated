@@ -1,26 +1,65 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { mockBackend } from '../../../../mockBackend.tsx';
+import { Bill, IBill } from '../../models/Bill.model';
 import { priceComparisonService } from '../../services/price-comparison.service';
 
 export const getInsights = asyncHandler(async (req: any, res: any) => {
-    const bills = mockBackend.bills.getAll();
-    const insights = mockBackend.analysis.getSpendingInsights(bills);
+    const bills = await Bill.find().sort({ date: -1 });
+    // TODO: Implement insights calculation
+    const insights = {
+        totalSpent: bills.reduce((sum, bill) => sum + bill.totalAmount, 0),
+        totalBills: bills.length,
+        averageBillAmount: bills.length > 0 ? bills.reduce((sum, bill) => sum + bill.totalAmount, 0) / bills.length : 0
+    };
     res.status(200).json(insights);
 });
 
 export const getShoppingList = asyncHandler(async (req: any, res: any) => {
-    const bills = mockBackend.bills.getAll();
-    const list = mockBackend.analysis.generateShoppingList(bills);
-    res.status(200).json(list);
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const bills = await Bill.find({ date: { $gte: threeMonthsAgo } }).sort({ date: -1 });
+
+    // Calculate item frequency
+    const itemFrequency: Record<string, { count: number; totalPrice: number; totalQuantity: number; category: string }> = {};
+
+    bills.forEach(bill => {
+        bill.items.forEach(item => {
+            const key = item.name.toLowerCase().trim();
+            if (!itemFrequency[key]) {
+                itemFrequency[key] = { count: 0, totalPrice: 0, totalQuantity: 0, category: item.category || 'Other' };
+            }
+            itemFrequency[key].count += 1;
+            itemFrequency[key].totalPrice += item.price;
+            itemFrequency[key].totalQuantity += item.quantity || 1;
+        });
+    });
+
+    // Generate list from items bought 2+ times
+    const items = Object.entries(itemFrequency)
+        .filter(([_, data]) => data.count >= 2)
+        .map(([name, data]) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            frequency: data.count,
+            avgPrice: data.totalPrice / data.count,
+            suggestedQuantity: Math.ceil(data.totalQuantity / data.count),
+            category: data.category,
+            checked: false
+        }))
+        .sort((a, b) => b.frequency - a.frequency);
+
+    res.status(200).json({
+        items,
+        totalItems: items.length
+    });
 });
 
 export const getPrices = asyncHandler(async (req: any, res: any) => {
     const { billId } = req.params;
     console.log(`\n🎯 [API REQUEST] GET /api/v1/analysis/prices/${billId}`);
 
-    const bills = mockBackend.bills.getAll();
-    const bill = bills.find(b => b.id === billId);
+    const bill = await Bill.findOne({ id: billId });
 
     if (!bill) {
         console.log(`❌ [ERROR] Bill not found: ${billId}`);

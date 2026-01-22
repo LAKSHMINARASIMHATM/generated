@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #059669;
+  --color-primary-foreground: #ffffff;
+  --color-primary-hover: #047857;
+
+  --color-secondary: #e7e5e4;
+  --color-secondary-foreground: #1c1917;
+
+  --color-accent: #f97316;
+  --color-accent-foreground: #ffffff;
+
+  --color-background: #fafaf9;
+  --color-background-dark: #0c0a09;
+
+  --color-surface: #ffffff;
+  --color-surface-dark: #1c1917;
+
+  --font-family-heading: Manrope, sans-serif;
+  --font-family-body: "Public Sans", sans-serif;
+  --font-family-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  font-family: 'Public Sans', sans-serif;
+  background-color: #fafaf9;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Manrope', sans-serif;
+}
+
+.receipt-jagged {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" viewBox="0 0 20 10"><path d="M0 10 L5 0 L10 10 L15 0 L20 10 Z" fill="black"/></svg>');
+  mask-repeat: repeat-x;
+  mask-position: bottom;
+  padding-bottom: 20px;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.scan-line {
+  position: absolute;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(to right, transparent, #059669, transparent);
+  animation: scan 2s linear infinite;
+}
+
+@keyframes scan {
+  0% {
+    top: 0%;
+  }
+
+  100% {
+    top: 100%;
+  }
+}

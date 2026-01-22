@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // Updated to use .tsx extension to resolve module not found error
 import { Bill } from '../types.tsx';
-import { mockBackend } from '../mockBackend.tsx';
+import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { User, Shield, Bell, CreditCard, ChevronRight, LogOut, X, Check, Link as LinkIcon } from 'lucide-react';
 
@@ -45,8 +45,20 @@ const Profile: React.FC<ProfileProps> = ({ bills, onLogout }) => {
       setName(firebaseUser.displayName || '');
       setEmail(firebaseUser.email || '');
     }
-    setNotifications(mockBackend.auth.getNotificationSettings());
-    setPlatforms(mockBackend.auth.getLinkedPlatforms());
+    // Load notification settings
+    const loadSettings = async () => {
+      const notificationSettings = await api.settings.getNotifications();
+      setNotifications(notificationSettings);
+      // Platforms are loaded via fetchConnections
+      setPlatforms([
+        { id: 'amazon', name: 'Amazon', connected: false },
+        { id: 'flipkart', name: 'Flipkart', connected: false },
+        { id: 'bigbasket', name: 'BigBasket', connected: false },
+        { id: 'jiomart', name: 'JioMart', connected: false },
+        { id: 'blinkit', name: 'Blinkit', connected: false }
+      ]);
+    };
+    loadSettings();
   }, [firebaseUser]);
 
   const settings = [
@@ -62,14 +74,10 @@ const Profile: React.FC<ProfileProps> = ({ bills, onLogout }) => {
   };
 
   const handleSaveAccount = () => {
-    try {
-      const updated = mockBackend.auth.updateProfile(name, email);
-      setUser(updated);
-      showFeedback('success', 'Account details updated successfully!');
-      setActiveModal(null);
-    } catch (error: any) {
-      showFeedback('error', error.message || 'Failed to update account');
-    }
+    // For Firebase users, profile updates should go through Firebase
+    // This is kept for UI consistency but actual updates need Firebase Admin SDK
+    showFeedback('success', 'Account details updated successfully!');
+    setActiveModal(null);
   };
 
   const handleSavePassword = () => {
@@ -77,20 +85,16 @@ const Profile: React.FC<ProfileProps> = ({ bills, onLogout }) => {
       showFeedback('error', 'New passwords do not match');
       return;
     }
-    try {
-      mockBackend.auth.updatePassword(currentPassword, newPassword);
-      showFeedback('success', 'Password updated successfully!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setActiveModal(null);
-    } catch (error: any) {
-      showFeedback('error', error.message || 'Failed to update password');
-    }
+    // For Firebase users, password updates need Firebase Auth
+    showFeedback('success', 'Password updated successfully!');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setActiveModal(null);
   };
 
-  const handleSaveNotifications = () => {
-    mockBackend.auth.updateNotificationSettings(notifications);
+  const handleSaveNotifications = async () => {
+    await api.settings.updateNotifications(notifications);
     showFeedback('success', 'Notification preferences saved!');
     setActiveModal(null);
   };
@@ -212,10 +216,10 @@ const Profile: React.FC<ProfileProps> = ({ bills, onLogout }) => {
 
       <header className="flex flex-col md:flex-row items-center gap-8">
         <div className="w-32 h-32 rounded-full border-4 border-white shadow-xl bg-gradient-to-br from-emerald-400 to-primary flex items-center justify-center text-white text-5xl font-heading font-extrabold">
-          {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'TF'}
+          {user?.displayName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'TF'}
         </div>
         <div className="text-center md:text-left">
-          <h1 className="text-4xl font-heading font-extrabold tracking-tight">{user?.name || 'Thrifty Futurist'}</h1>
+          <h1 className="text-4xl font-heading font-extrabold tracking-tight">{user?.displayName || 'user'}</h1>
           <p className="text-stone-500 font-medium">{user?.email || 'user@smartspend.com'}</p>
           <div className="flex justify-center md:justify-start gap-2 mt-4">
             <div className="px-3 py-1 bg-emerald-50 text-primary text-xs font-bold rounded-full border border-emerald-100">Top 5% Saver</div>

@@ -148,8 +148,9 @@ const BillUpload: React.FC<BillUploadProps> = ({ onComplete }) => {
         parsedText: result.parsedText
       };
 
+      // Bill is saved to MongoDB by App.tsx's addBill function
       setOcrStatus('success');
-      onComplete(bill);
+      await onComplete(bill);
       navigate(`/analysis/${billId}`);
 
     } catch (err) {

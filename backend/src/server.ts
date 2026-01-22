@@ -3,6 +3,10 @@ import { app } from './app';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
+// Import models to ensure they are registered
+import './models/PlatformConnection.model';
+import './models/Bill.model';
+
 dotenv.config();
 
 const PORT = process.env.PORT || 8000;

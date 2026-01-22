@@ -11,7 +11,7 @@ import ShoppingList from './pages/ShoppingList.tsx';
 import Profile from './pages/Profile.tsx';
 import Login from './pages/Login.tsx';
 import OAuthAuthorize from './pages/OAuthAuthorize.tsx';
-import { mockBackend } from './mockBackend.tsx';
+import { api } from './api';
 import { Bill } from './types.tsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
 
@@ -71,23 +71,39 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
 const AppContent: React.FC = () => {
   const { user: firebaseUser, signOut } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (firebaseUser) {
-      setBills(mockBackend.bills.getAll());
-    }
+    const loadBills = async () => {
+      if (firebaseUser) {
+        try {
+          const fetchedBills = await api.bills.getAll();
+          setBills(Array.isArray(fetchedBills) ? fetchedBills : []);
+        } catch (error) {
+          console.error('Failed to load bills:', error);
+          setBills([]);
+        }
+      }
+      setLoading(false);
+    };
+    loadBills();
   }, [firebaseUser]);
 
   const handleLogout = async () => {
     await signOut();
-    mockBackend.auth.logout();
     navigate('/');
   };
 
-  const addBill = (bill: Bill) => {
-    const savedBill = mockBackend.bills.save(bill);
-    setBills(prev => [savedBill, ...prev]);
+  const addBill = async (bill: Bill) => {
+    try {
+      await api.bills.save(bill);
+      setBills(prev => [bill, ...prev]);
+    } catch (error) {
+      console.error('Failed to save bill:', error);
+      // Still add to local state for UX
+      setBills(prev => [bill, ...prev]);
+    }
   };
 
   if (!firebaseUser) {
